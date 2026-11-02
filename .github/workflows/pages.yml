@@ -1,0 +1,40 @@
+name: Web preview maps
+
+# Copies a few state maps from the release onto GitHub Pages, so the app's
+# browser preview can read them (Pages allows that; release downloads don't).
+# The phone apps download from the release, not from here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      states:
+        description: "States to put on Pages"
+        default: "georgia"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  pages:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - name: Get maps from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p site/streets-v1
+          for s in ${{ github.event.inputs.states }}; do
+            gh release download streets-v1 -R "$GITHUB_REPOSITORY" -p "$s.pmtiles" -D site/streets-v1
+          done
+          echo '<!doctype html><title>Grid Down maps</title><p>Map files for the Grid Down app. Map data © OpenStreetMap contributors (ODbL), © OpenMapTiles.</p>' > site/index.html
+          ls -lh site/streets-v1
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: d
+        uses: actions/deploy-pages@v4
