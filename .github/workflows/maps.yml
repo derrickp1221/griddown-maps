@@ -56,12 +56,14 @@ jobs:
           ls -lh state.osm.pbf
       - name: Build tiles
         run: |
+          # Alaska's area is huge and crosses the date line; keep the mainland and stop one zoom level early.
+          EXTRA=""; MZ=14; [ "${{ matrix.state }}" = alaska ] && { EXTRA="--bounds=-179.2,51.2,-129.9,71.5"; MZ=13; }
           java -Xmx10g -jar planetiler.jar \
             --osm-path=state.osm.pbf --download --download_dir=data/sources \
             --output=${{ matrix.state }}.pmtiles --force \
-            --maxzoom=14 --languages=en \
+            --maxzoom=$MZ --languages=en \
             --exclude_layers=building,poi,housenumber,landcover,landuse,park,mountain_peak,aeroway \
-            --nodes=ram
+            --nodes=ram $EXTRA
           ls -lh ${{ matrix.state }}.pmtiles
       - uses: actions/upload-artifact@v4
         if: github.event.inputs.release == ''
