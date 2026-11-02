@@ -1,0 +1,55 @@
+name: Whole U.S. road map
+
+# One map of the whole country: interstates, highways, main roads, towns, water and rail.
+# Stops at zoom 11, so side streets are left out (those come from the state maps).
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Release tag"
+        default: "streets-v1"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Use the big scratch disk
+        run: |
+          sudo mkdir -p /mnt/work && sudo chown $USER /mnt/work
+          df -h /mnt / | cat
+      - uses: actions/cache@v4
+        with:
+          path: /mnt/work/data/sources
+          key: planetiler-sources-us-v1
+      - name: Get Planetiler and the U.S. extract
+        working-directory: /mnt/work
+        run: |
+          curl -sSL -o planetiler.jar https://github.com/onthegomap/planetiler/releases/latest/download/planetiler.jar
+          mkdir -p data/sources
+          curl -sSL -o us.osm.pbf https://download.geofabrik.de/north-america/us-latest.osm.pbf
+          ls -lh us.osm.pbf
+      - name: Build tiles
+        working-directory: /mnt/work
+        run: |
+          java -Xmx12g -jar planetiler.jar \
+            --osm-path=us.osm.pbf --download --download_dir=data/sources \
+            --output=united-states.pmtiles --force \
+            --bounds=-179.2,18.5,-66.5,71.5 \
+            --maxzoom=11 --languages=en \
+            --exclude_layers=building,poi,housenumber,landcover,landuse,park,mountain_peak,aeroway \
+            --nodes=mmap --storage=mmap --tmpdir=/mnt/work/tmp
+          ls -lh united-states.pmtiles
+      - name: Publish to release
+        working-directory: /mnt/work
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.inputs.release }}" united-states.pmtiles -R "$GITHUB_REPOSITORY" --clobber
