@@ -6,6 +6,9 @@ name: Street map packs
 # Geofabrik state names, e.g. "georgia florida". Leave it as "all" for every state.
 
 on:
+  # Rebuilt from fresh OpenStreetMap data on the 2nd of every month.
+  schedule:
+    - cron: "17 5 2 * *"
   workflow_dispatch:
     inputs:
       states:
@@ -27,7 +30,7 @@ jobs:
       - id: p
         run: |
           ALL="alabama alaska arizona arkansas california colorado connecticut delaware district-of-columbia florida georgia hawaii idaho illinois indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota mississippi missouri montana nebraska nevada new-hampshire new-jersey new-mexico new-york north-carolina north-dakota ohio oklahoma oregon pennsylvania rhode-island south-carolina south-dakota tennessee texas utah vermont virginia washington west-virginia wisconsin wyoming"
-          S="${{ github.event.inputs.states }}"; [ "$S" = "all" ] && S="$ALL"
+          S="${{ github.event.inputs.states || 'all' }}"; [ "$S" = "all" ] && S="$ALL"
           echo "states=$(printf '%s\n' $S | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
 
   build:
@@ -66,17 +69,17 @@ jobs:
             --nodes=ram $EXTRA
           ls -lh ${{ matrix.state }}.pmtiles
       - uses: actions/upload-artifact@v4
-        if: github.event.inputs.release == ''
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.release == ''
         with:
           name: ${{ matrix.state }}
           path: ${{ matrix.state }}.pmtiles
           compression-level: 0
           retention-days: 7
       - name: Publish to release
-        if: github.event.inputs.release != ''
+        if: github.event_name == 'schedule' || github.event.inputs.release != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${{ github.event.inputs.release }}" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create "${{ github.event.inputs.release }}" -R "$GITHUB_REPOSITORY" -t "Street maps ${{ github.event.inputs.release }}" -n "Offline street maps built from OpenStreetMap. Map data © OpenStreetMap contributors (ODbL). Tile schema © OpenMapTiles." || true
-          gh release upload "${{ github.event.inputs.release }}" ${{ matrix.state }}.pmtiles -R "$GITHUB_REPOSITORY" --clobber
+          gh release view "${{ github.event.inputs.release || 'streets-v1' }}" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "${{ github.event.inputs.release || 'streets-v1' }}" -R "$GITHUB_REPOSITORY" -t "Street maps ${{ github.event.inputs.release || 'streets-v1' }}" -n "Offline street maps built from OpenStreetMap. Map data © OpenStreetMap contributors (ODbL). Tile schema © OpenMapTiles." || true
+          gh release upload "${{ github.event.inputs.release || 'streets-v1' }}" ${{ matrix.state }}.pmtiles -R "$GITHUB_REPOSITORY" --clobber

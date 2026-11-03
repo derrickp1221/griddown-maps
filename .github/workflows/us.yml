@@ -4,6 +4,9 @@ name: Whole U.S. road map
 # Stops at zoom 11, so side streets are left out (those come from the state maps).
 
 on:
+  # Rebuilt on the 2nd of every month, alongside the state maps.
+  schedule:
+    - cron: "47 5 2 * *"
   workflow_dispatch:
     inputs:
       release:
@@ -52,4 +55,4 @@ jobs:
         working-directory: /mnt/work
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.inputs.release }}" united-states.pmtiles -R "$GITHUB_REPOSITORY" --clobber
+        run: gh release upload "${{ github.event.inputs.release || 'streets-v1' }}" united-states.pmtiles -R "$GITHUB_REPOSITORY" --clobber
